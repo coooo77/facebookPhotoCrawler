@@ -1,0 +1,8 @@
+{
+  "puppeteerConfig": {
+    "headless": false,
+    "executablePath": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+  },
+  "destination": "https://www.facebook.com/photo.php?fbid=XXX",
+  "screenshotWeb": true
+}
