@@ -1,139 +1,101 @@
+import fs from 'fs'
 import path from 'path'
-import download from 'image-downloader'
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 
-import userConfig from './config.json'
+import config from './config.json'
 
 import helper from './utils/helper'
 import fileSys from './utils/fileSys'
+import FetchPhoto from './utils/fetchPhoto'
+
 import type { Browser, Page } from 'puppeteer'
+import type { PhotoInfo } from './types/photo'
+import type { FailLog, UserConfig } from './types/config'
 
 puppeteer.use(StealthPlugin())
 
-let page: Page
-let browser: Browser
-let isFetchNextImg = false
+const userConfig = config as UserConfig
+const failLogPath = path.join(__dirname, '..', 'fail.json')
 const dataFolder = path.join(__dirname, '..', fileSys.getDataSavePath())
 
-const selectors = {
-  firstImg: 'a > img',
-  photoImg: 'img[data-visualcompletion="media-vc-image"]',
-  readMore: '[role="complementary"] span [role="button"]',
-  complementary: '[role="complementary"] div.xyinxu5.x4uap5.x1g2khh7.xkhd6sd > span',
-  nextImgButton: '[aria-label="Next photo"]',
+let page: Page
+let tryCount = 0
+let browser: Browser
+let targetUrl = userConfig.destination
+let photos: Map<string, PhotoInfo> = new Map()
+let fetchPhotoInstance: FetchPhoto | null = null
+
+async function checkIfFail() {
+  if (!fs.existsSync(failLogPath)) return
+
+  const failLog = fileSys.getJSONFile<FailLog>(failLogPath)
+  if (!failLog) return
+
+  const msg = 'crawler fail to previous work, type "yes" if you want to resume it. '
+  const result = await helper.customPrompt(msg)()
+
+  if (result !== 'yes') return
+
+  if (!failLog.currentUrl) throw new Error('no target URL provided')
+
+  targetUrl = failLog.currentUrl
+  photos = new Map(Object.entries(failLog.photoData))
+
+  fs.unlinkSync(failLogPath)
 }
 
-async function mainProcess() {
-  browser = await puppeteer.launch(userConfig.puppeteerConfig)
-  page = await browser.newPage()
-  await page.setViewport({ width: 1920, height: 1080 })
-  await page.goto(userConfig.destination)
-  await helper.wait(5)
-
-  do {
-    const { fbid, isExist } = await processPhoto()
-    await clickNextPage(fbid)
-    isFetchNextImg = isExist
-  } while (!isFetchNextImg)
-
-  exportHandleLog()
-
-  await browser.close()
-}
-
-function getFbid() {
-  return new URL(page.url()).searchParams.get('fbid')
-}
-
-async function clickReadMore() {
-  const haveReadMore = await page.evaluate((s) => {
-    const readMoreBtn = document.querySelector(s.readMore) as HTMLElement
-    if (readMoreBtn && !readMoreBtn.innerHTML.includes('img')) readMoreBtn.click()
-    return Boolean(readMoreBtn)
-  }, selectors)
-
-  if (haveReadMore) await helper.wait(0.5)
-}
-
-interface PhotoInfo {
-  url: string
-  imgUrl: string
-  complementary: string
-  exportPhotoName: string
-}
-const photos: Map<string, PhotoInfo> = new Map()
-async function fetchPhotoInfo() {
-  await clickReadMore()
-
-  const { imgUrl, complementary } = await page.evaluate((s) => {
-    const img = document.querySelector(s.photoImg) as HTMLImageElement
-    const complementary = document.querySelector(s.complementary) as HTMLElement
-
-    return {
-      imgUrl: img.src,
-      complementary: complementary?.innerText,
-    }
-  }, selectors)
-
-  return {
-    fbid: getFbid(),
-    imgUrl,
-    complementary,
-  }
-}
-
-async function processPhoto() {
-  const { imgUrl, complementary, fbid } = await fetchPhotoInfo()
-
-  const isExist = Boolean(fbid && photos.get(fbid))
-  if (isExist) return { fbid, isExist }
-
-  const exportPhotoName = fbid || ''
-
-  await download.image({
-    url: imgUrl,
-    dest: path.join(dataFolder, `${exportPhotoName}.jpg`),
+async function intervalTask() {
+  fetchPhotoInstance = new FetchPhoto({
+    page,
+    photos,
+    targetUrl,
+    dataFolder,
   })
 
-  if (userConfig.screenshotWeb) {
-    await page.screenshot({
-      path: path.join(dataFolder, `${exportPhotoName}_screenshot.jpg`),
-    })
+  try {
+    await fetchPhotoInstance.process()
+  } catch (error) {
+    targetUrl = fetchPhotoInstance.currentUrl
+    fetchPhotoInstance = null
+
+    const limit = userConfig.retryLimit
+    const isUlimitTry = typeof limit === 'number' && limit === 0
+    const shouldRetry = typeof limit === 'number' && limit > 0 && ++tryCount <= limit
+
+    if (isUlimitTry || shouldRetry) {
+      let isInternetWorking = await helper.checkInternetConnection()
+
+      while (!isInternetWorking) {
+        await helper.wait(60)
+        isInternetWorking = await helper.checkInternetConnection()
+      }
+
+      await intervalTask()
+    } else {
+      throw new Error('Crawler failed due to reach limit')
+    }
   }
-
-  if (fbid) {
-    photos.set(fbid, {
-      url: page.url(),
-      imgUrl,
-      complementary,
-      exportPhotoName,
-    })
-  }
-
-  return { fbid, isExist }
 }
 
-async function clickNextPage(fbid: string | null) {
-  let id
+async function main() {
+  await checkIfFail()
 
-  do {
-    await page.evaluate((s) => {
-      const buttons = document.querySelector(s.nextImgButton)
-      const nextBtn = buttons as HTMLLIElement
-      nextBtn.click()
-    }, selectors)
-
-    id = getFbid()
-
-    await helper.wait(0.75)
-  } while (id === fbid)
+  browser = await puppeteer.launch(userConfig.puppeteerConfig)
+  page = await browser.newPage()
+  // await page.setDefaultNavigationTimeout(0)
+  await page.setViewport({ width: 1920, height: 1080 })
+  await intervalTask()
 }
 
-function exportHandleLog() {
-  const data = Object.fromEntries(photos.entries())
-  const filePath = path.join(dataFolder, `${new Date().getTime()}.json`)
-  fileSys.saveJSONFile(filePath, data)
-}
+main()
 
-mainProcess()
+process.on('exit', (code) => {
+  if (code === 0 || !fetchPhotoInstance?.currentUrl) return
+
+  const photoData = Object.fromEntries(photos.entries())
+  const currentUrl = fetchPhotoInstance?.currentUrl
+  const data = { currentUrl, photoData }
+
+  fileSys.saveJSONFile(failLogPath, data)
+})

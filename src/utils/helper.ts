@@ -1,4 +1,5 @@
 'use strict'
+import dns from 'dns'
 import readline from 'readline'
 
 export default {
@@ -19,4 +20,10 @@ export default {
   },
 
   wait: (seconds: number) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
+
+  checkInternetConnection(): Promise<boolean> {
+    return new Promise((res) => {
+      dns.resolve('www.google.com', (err) => res(!Boolean(err)))
+    })
+  },
 }
