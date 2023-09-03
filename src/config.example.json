@@ -3,6 +3,8 @@
     "headless": false,
     "executablePath": "C:/Program Files/Google/Chrome/Application/chrome.exe"
   },
-  "destination": "https://www.facebook.com/photo.php?fbid=XXX",
-  "screenshotWeb": true
+  "destination": "https://www.facebook.com/photo.php?fbid=XXX&set=XXX",
+  "screenshotWeb": false,
+  "fullLoad": false,
+  "retryLimit": 30
 }

@@ -43,6 +43,9 @@ export default class FetchPhoto {
   async process() {
     await this.navigateToPage()
 
+    const isContinueWork = this.photos.size !== 0
+    if (isContinueWork) await this.clickNextPage(this.getFbid())
+
     do {
       await this.clickReadMore()
       const { fbid, isPhotoFetched } = await this.processPhoto()
@@ -78,15 +81,30 @@ export default class FetchPhoto {
     let id
 
     do {
-      await Promise.all([this.page.click(this.selectors.nextImgButton), this.page.waitForNavigation({ waitUntil: 'networkidle0' })])
+      await this.page.evaluate((s) => {
+        const nextBtn = document.querySelector(s.nextImgButton) as HTMLElement
+        nextBtn?.click()
+      }, this.selectors)
+
       id = this.getFbid()
+
+      await helper.wait(0.5)
     } while (preFbid === id)
+
+    if (userConfig.fullLoad) await this.navigateToPage(this.page.url())
   }
 
   async processPhoto() {
-    await this.clickReadMore()
     const fbid = this.getFbid()
-    const { imgUrl, complementary } = await this.fetchPhotoInfo()
+
+    let fetchData = {
+      imgUrl: '',
+      complementary: '',
+    }
+
+    do {
+      fetchData = await this.fetchPhotoInfo()
+    } while (!fetchData.imgUrl)
 
     const isPhotoFetched = Boolean(fbid && this.photos.get(fbid))
     if (isPhotoFetched) return { fbid, isPhotoFetched }
@@ -97,8 +115,8 @@ export default class FetchPhoto {
 
     if (fbid) {
       this.photos.set(fbid, {
-        imgUrl,
-        complementary,
+        imgUrl: fetchData.imgUrl,
+        complementary: fetchData.complementary,
         url: this.page.url(),
       })
     }
@@ -122,7 +140,7 @@ export default class FetchPhoto {
       const complementary = document.querySelector(s.complementary) as HTMLElement
 
       return {
-        imgUrl: img.src,
+        imgUrl: img?.src,
         complementary: complementary?.innerText,
       }
     }, this.selectors)
@@ -133,8 +151,8 @@ export default class FetchPhoto {
     }
   }
 
-  async navigateToPage() {
-    await Promise.all([this.page.goto(this.targetUrl), this.page.waitForNavigation({ waitUntil: 'networkidle0' })])
+  async navigateToPage(url = this.targetUrl) {
+    await Promise.all([this.page.goto(url), this.page.waitForNavigation({ waitUntil: 'networkidle0' })])
   }
 
   async clickReadMore() {

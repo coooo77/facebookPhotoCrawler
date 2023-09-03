@@ -41,8 +41,6 @@ async function checkIfFail() {
 
   targetUrl = failLog.currentUrl
   photos = new Map(Object.entries(failLog.photoData))
-
-  fs.unlinkSync(failLogPath)
 }
 
 async function intervalTask() {
@@ -59,11 +57,10 @@ async function intervalTask() {
     targetUrl = fetchPhotoInstance.currentUrl
     fetchPhotoInstance = null
 
-    const limit = userConfig.retryLimit
-    const isUlimitTry = typeof limit === 'number' && limit === 0
-    const shouldRetry = typeof limit === 'number' && limit > 0 && ++tryCount <= limit
+    const limit = Number(userConfig.retryLimit) <= 120 ? Number(userConfig.retryLimit) : 120
+    const shouldRetry = limit > 0 && ++tryCount <= limit
 
-    if (isUlimitTry || shouldRetry) {
+    if (shouldRetry) {
       let isInternetWorking = await helper.checkInternetConnection()
 
       while (!isInternetWorking) {
@@ -73,6 +70,8 @@ async function intervalTask() {
 
       await intervalTask()
     } else {
+      await browser.close()
+
       throw new Error('Crawler failed due to reach limit')
     }
   }
@@ -83,9 +82,13 @@ async function main() {
 
   browser = await puppeteer.launch(userConfig.puppeteerConfig)
   page = await browser.newPage()
-  // await page.setDefaultNavigationTimeout(0)
+  await page.setDefaultNavigationTimeout(0)
   await page.setViewport({ width: 1920, height: 1080 })
   await intervalTask()
+
+  await browser.close()
+
+  if (!fs.existsSync(failLogPath)) fs.unlinkSync(failLogPath)
 }
 
 main()

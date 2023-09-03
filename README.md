@@ -12,10 +12,12 @@ npm install
 
 ### step 2 - create config.json file in src folder
 
-- executablePath - path of chrome.exe
-- headless - set it false to show crawler brower
+- puppeteerConfig.executablePath - path of chrome.exe
+- puppeteerConfig.headless - set it false to show crawler brower
 - screenshotWeb - take screenshot from website
-- destination: url from facebook, e.g. https://www.facebook.com/photo.php?fbid=XXX
+- destination: url from facebook, e.g. https://www.facebook.com/photo.php?fbid=XXX&set=XXX
+- fullLoad - Waiting for the website to load completely
+- Retry attempts on disconnection. If not set, the web crawler will immediately terminate on network disconnection, with a maximum limit of 120 attempts.
 
 ```
 // src\config.json
@@ -25,7 +27,9 @@ npm install
     "executablePath": "path/to/chrome.exe"
   },
   "destination": "url to facebook photo gallery",
-  "screenshotWeb": true
+  "screenshotWeb": true,
+  "fullLoad": false,
+  "retryLimit": 30
 }
 ```
 
