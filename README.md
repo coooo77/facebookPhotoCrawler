@@ -17,7 +17,7 @@ npm install
 - screenshotWeb - take screenshot from website
 - destination: url from facebook, e.g. https://www.facebook.com/photo.php?fbid=XXX&set=XXX
 - fullLoad - Waiting for the website to load completely
-- Retry attempts on disconnection. If not set, the web crawler will immediately terminate on network disconnection, with a maximum limit of 120 attempts.
+- retryLimit - Retry attempts on disconnection. If not set, the web crawler will immediately terminate on network disconnection, with a maximum limit of 120 attempts.
 
 ```
 // src\config.json
