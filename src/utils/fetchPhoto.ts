@@ -97,6 +97,8 @@ export default class FetchPhoto {
   async processPhoto() {
     const fbid = this.getFbid()
 
+    let failCount = 0
+
     let fetchData = {
       imgUrl: '',
       complementary: '',
@@ -104,6 +106,10 @@ export default class FetchPhoto {
 
     do {
       fetchData = await this.fetchPhotoInfo()
+      
+      if (++failCount <= 10) continue
+      failCount = 0
+      await this.navigateToPage(this.page.url())
     } while (!fetchData.imgUrl)
 
     const isPhotoFetched = Boolean(fbid && this.photos.get(fbid))
