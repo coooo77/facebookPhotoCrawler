@@ -64,7 +64,7 @@ export default class FetchPhoto {
 
   async downloadPhotos(fbid: string, imgUrl: string) {
     const photoPath = path.join(this.dataFolder, `${fbid}.jpg`)
-    if (fs.existsSync(photoPath))
+    if (!fs.existsSync(photoPath))
       await download.image({
         dest: photoPath,
         url: imgUrl,
