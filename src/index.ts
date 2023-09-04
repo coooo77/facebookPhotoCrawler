@@ -106,6 +106,8 @@ async function main() {
   } catch (error) {
     console.log('[main process error]')
     console.error(error)
+
+    throw error
   }
 }
 
