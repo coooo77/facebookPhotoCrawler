@@ -88,7 +88,7 @@ async function main() {
 
   await browser.close()
 
-  if (!fs.existsSync(failLogPath)) fs.unlinkSync(failLogPath)
+  if (fs.existsSync(failLogPath)) fs.unlinkSync(failLogPath)
 }
 
 main()
