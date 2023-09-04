@@ -43,6 +43,15 @@ async function checkIfFail() {
   photos = new Map(Object.entries(failLog.photoData))
 }
 
+function injectWorkLogJson() {
+  if (!userConfig.workLogPath || !fs.existsSync(userConfig.workLogPath)) return
+
+  const workLogJson = fileSys.getJSONFile<Record<string, PhotoInfo>>(userConfig.workLogPath)
+  if (!workLogJson) return
+
+  photos = new Map(Object.entries(workLogJson))
+}
+
 async function intervalTask() {
   fetchPhotoInstance = new FetchPhoto({
     page,
@@ -78,6 +87,7 @@ async function intervalTask() {
 }
 
 async function main() {
+  injectWorkLogJson()
   await checkIfFail()
 
   browser = await puppeteer.launch(userConfig.puppeteerConfig)

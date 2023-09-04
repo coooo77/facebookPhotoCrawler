@@ -13,6 +13,7 @@ export interface UserConfig {
   screenshotWeb: boolean
   retryLimit?: number
   fullLoad?: boolean
+  workLogPath?: string
 }
 
 export interface FailLog {
