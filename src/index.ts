@@ -63,7 +63,10 @@ async function intervalTask() {
   try {
     await fetchPhotoInstance.process()
   } catch (error) {
-    targetUrl = fetchPhotoInstance.currentUrl
+    console.error(error)
+
+    const photoFetched = Array.from(photos).at(-1)
+    if (photoFetched && photoFetched?.[1]?.imgUrl) targetUrl = photoFetched[1].imgUrl
     fetchPhotoInstance = null
 
     const limit = Number(userConfig.retryLimit) <= 120 ? Number(userConfig.retryLimit) : 120
@@ -87,28 +90,33 @@ async function intervalTask() {
 }
 
 async function main() {
-  injectWorkLogJson()
-  await checkIfFail()
+  try {
+    injectWorkLogJson()
+    await checkIfFail()
 
-  browser = await puppeteer.launch(userConfig.puppeteerConfig)
-  page = await browser.newPage()
-  await page.setDefaultNavigationTimeout(0)
-  await page.setViewport({ width: 1920, height: 1080 })
-  await intervalTask()
+    browser = await puppeteer.launch(userConfig.puppeteerConfig)
+    page = await browser.newPage()
+    await page.setDefaultNavigationTimeout(0)
+    await page.setViewport({ width: 1920, height: 1080 })
+    await intervalTask()
 
-  await browser.close()
+    await browser.close()
 
-  if (fs.existsSync(failLogPath)) fs.unlinkSync(failLogPath)
+    if (fs.existsSync(failLogPath)) fs.unlinkSync(failLogPath)
+  } catch (error) {
+    console.log('[main process error]')
+    console.error(error)
+  }
 }
 
 main()
 
 process.on('exit', (code) => {
-  if (code === 0 || !fetchPhotoInstance?.currentUrl) return
+  console.log(`exit code: ${code}, targetUrl: ${targetUrl}`)
+  if (code === 0 || !targetUrl) return
 
   const photoData = Object.fromEntries(photos.entries())
-  const currentUrl = fetchPhotoInstance?.currentUrl
-  const data = { currentUrl, photoData }
+  const data = { currentUrl: targetUrl, photoData }
 
   fileSys.saveJSONFile(failLogPath, data)
 })
