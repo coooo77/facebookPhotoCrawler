@@ -53,7 +53,6 @@ export default class FetchPhoto {
       this.isFetchNextImg = !isPhotoFetched
     } while (this.isFetchNextImg)
 
-    await this.downloadPhotos()
     this.exportHandleLog()
   }
 
@@ -63,18 +62,15 @@ export default class FetchPhoto {
     fileSys.saveJSONFile(filePath, data)
   }
 
-  async downloadPhotos() {
-    for (const [fbid, photoInfo] of this.photos) {
-      const photoPath = path.join(this.dataFolder, `${fbid}.jpg`)
-      if (fs.existsSync(photoPath)) continue
-
+  async downloadPhotos(fbid: string, imgUrl: string) {
+    const photoPath = path.join(this.dataFolder, `${fbid}.jpg`)
+    if (fs.existsSync(photoPath))
       await download.image({
         dest: photoPath,
-        url: photoInfo.imgUrl,
+        url: imgUrl,
       })
 
-      await helper.wait(0.5)
-    }
+    await helper.wait(0.5)
   }
 
   async clickNextPage(preFbid: string | null) {
@@ -106,7 +102,7 @@ export default class FetchPhoto {
 
     do {
       fetchData = await this.fetchPhotoInfo()
-      
+
       if (++failCount <= 10) continue
       failCount = 0
       await this.navigateToPage(this.page.url())
@@ -125,6 +121,8 @@ export default class FetchPhoto {
         complementary: fetchData.complementary,
         url: this.page.url(),
       })
+
+      this.downloadPhotos(fbid, fetchData.imgUrl)
     }
 
     if (userConfig.screenshotWeb) {
