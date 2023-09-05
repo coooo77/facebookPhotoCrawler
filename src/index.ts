@@ -63,6 +63,7 @@ async function intervalTask() {
   try {
     await fetchPhotoInstance.process()
   } catch (error) {
+    console.log('[intervalTask error]')
     console.error(error)
 
     const photoFetched = Array.from(photos).at(-1)
