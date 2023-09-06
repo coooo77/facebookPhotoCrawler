@@ -77,6 +77,7 @@ export default class FetchPhoto {
 
     do {
       const nextImgButton = await this.page.$(this.selectors.nextImgButton)
+      console.log('nextImgButton', nextImgButton)
       if (nextImgButton) await Promise.all([nextImgButton.click(), this.page.waitForNavigation()])
 
       id = this.getFbid()
