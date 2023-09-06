@@ -4,14 +4,18 @@ import fs from 'fs'
 import path from 'path'
 
 export default {
-  cookiePath: path.join('cookie', 'cookie.json'),
+  cookiePath: path.join(__dirname, '..', '..', 'cookie', 'cookie.json'),
 
-  dataSavePath: path.join('data'),
+  dataSavePath: path.join(__dirname, '..', '..', 'data'),
 
-  getDataSavePath() {
-    if (!fs.existsSync(this.dataSavePath)) this.makeDirIfNotExist(this.dataSavePath)
+  failLogPath: path.join(__dirname, '..', '..', 'fail'),
 
-    return this.dataSavePath
+  getOrCreateDirPath(type: 'data' | 'fail') {
+    const targetPath = type === 'data' ? this.dataSavePath : this.failLogPath
+
+    if (!fs.existsSync(targetPath)) this.makeDirIfNotExist(targetPath)
+
+    return targetPath
   },
 
   getJSONFile<T>(filePath: string): T | null {
@@ -23,6 +27,8 @@ export default {
   },
 
   makeDirIfNotExist(fileLocation: string) {
+    if (!fileLocation) throw new Error(`invalid dir path: ${fileLocation};`)
+
     if (fs.existsSync(fileLocation)) return
 
     fs.mkdirSync(fileLocation, { recursive: true })

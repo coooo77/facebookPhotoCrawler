@@ -1,125 +1,128 @@
 import fs from 'fs'
 import path from 'path'
-import puppeteer from 'puppeteer-extra'
-import StealthPlugin from 'puppeteer-extra-plugin-stealth'
-
-import config from './config.json'
+import cp from 'child_process'
+import { select, confirm, isCancel } from '@clack/prompts'
 
 import helper from './utils/helper'
 import fileSys from './utils/fileSys'
-import FetchPhoto from './utils/fetchPhoto'
 
-import type { Browser, Page } from 'puppeteer'
+import config from './config.json'
+
 import type { PhotoInfo } from './types/photo'
 import type { FailLog, UserConfig } from './types/config'
 
-puppeteer.use(StealthPlugin())
-
 const userConfig = config as UserConfig
-const failLogPath = path.join(__dirname, '..', 'fail.json')
-const dataFolder = path.join(__dirname, '..', fileSys.getDataSavePath())
+const retryLimit = Number(userConfig.retryLimit)
+const limit = retryLimit <= 120 ? retryLimit : 120
 
-let page: Page
-let tryCount = 0
-let browser: Browser
-let targetUrl = userConfig.destination
-let photos: Map<string, PhotoInfo> = new Map()
-let fetchPhotoInstance: FetchPhoto | null = null
+let retryCount = 0
+let currentUrl = userConfig.destination
+let photoData: Map<string, PhotoInfo> = new Map()
 
-async function checkIfFail() {
-  if (!fs.existsSync(failLogPath)) return
-
-  const failLog = fileSys.getJSONFile<FailLog>(failLogPath)
-  if (!failLog) return
-
-  const msg = 'crawler fail to previous work, type "yes" if you want to resume it. '
-  const result = await helper.customPrompt(msg)()
-
-  if (result !== 'yes') return
-
-  if (!failLog.currentUrl) throw new Error('no target URL provided')
-
-  targetUrl = failLog.currentUrl
-  photos = new Map(Object.entries(failLog.photoData))
+function updateFetchInfo(failLog: FailLog) {
+  currentUrl = failLog.currentUrl
+  photoData = new Map(Object.entries(failLog.photoData))
 }
 
-function injectWorkLogJson() {
-  if (!userConfig.workLogPath || !fs.existsSync(userConfig.workLogPath)) return
-
-  const workLogJson = fileSys.getJSONFile<Record<string, PhotoInfo>>(userConfig.workLogPath)
-  if (!workLogJson) return
-
-  photos = new Map(Object.entries(workLogJson))
+function injectFailLog(logPath: string) {
+  const failLog = fileSys.getJSONFile<FailLog>(logPath)
+  if (!failLog) return console.log('can not resolve fail log data!')
+  updateFetchInfo(failLog)
 }
 
-async function intervalTask() {
-  fetchPhotoInstance = new FetchPhoto({
-    page,
-    photos,
-    targetUrl,
-    dataFolder,
+async function checkFailInjection() {
+  if (!fs.existsSync(fileSys.failLogPath)) return
+
+  const logs = fs.readdirSync(fileSys.failLogPath).filter((file) => {
+    const { name, ext } = path.parse(file)
+    return name.includes('fail') && ext === '.json'
   })
 
-  try {
-    await fetchPhotoInstance.process()
-  } catch (error) {
-    console.log('[intervalTask error]')
-    console.error(error)
+  if (logs.length === 0) return
 
-    const photoFetched = Array.from(photos).at(-1)
-    if (photoFetched && photoFetched?.[1]?.imgUrl) targetUrl = photoFetched[1].imgUrl
-    fetchPhotoInstance = null
+  const shouldUseFailLog = await confirm({
+    message: 'Fail log detected, do you want to use it?',
+  })
 
-    const limit = Number(userConfig.retryLimit) <= 120 ? Number(userConfig.retryLimit) : 120
-    const shouldRetry = limit > 0 && ++tryCount <= limit
+  if (!shouldUseFailLog || isCancel(shouldUseFailLog)) return
 
-    if (shouldRetry) {
-      let isInternetWorking = await helper.checkInternetConnection()
+  if (logs.length === 1) {
+    const logPath = path.join(fileSys.failLogPath, logs[0])
 
-      while (!isInternetWorking) {
-        await helper.wait(60)
-        isInternetWorking = await helper.checkInternetConnection()
-      }
+    injectFailLog(logPath)
+  } else {
+    const options = logs.map((filename) => ({
+      label: filename,
+      value: path.join(fileSys.failLogPath, filename),
+    }))
 
-      await intervalTask()
-    } else {
-      await browser.close()
+    const fileSelected = await select<typeof options, string>({
+      message: 'which file to use?',
+      options,
+    })
 
-      throw new Error('Crawler failed due to reach limit')
-    }
+    injectFailLog(fileSelected as string)
   }
+}
+
+function runScript(): Promise<void> {
+  return new Promise((res, rej) => {
+    const payload = JSON.stringify({ currentUrl, photoData: Object.fromEntries(photoData.entries()) })
+
+    const child_process = cp.fork(path.join(__dirname, 'scripts', 'fetchPhotos.ts'), [payload])
+
+    child_process.on('message', updateFetchInfo)
+
+    child_process.on('close', (code) => {
+      child_process.off('close', () => {})
+      child_process.off('message', () => {})
+
+      const closeFn = code === 0 ? res : rej
+      closeFn()
+    })
+  })
+}
+
+function makeFailLog() {
+  const failLog: FailLog = {
+    currentUrl,
+    photoData: Object.fromEntries(photoData.entries()),
+  }
+
+  const failLogDir = fileSys.getOrCreateDirPath('fail')
+  const failFilename = `${new Date().getTime()}-fail.json`
+  const failLogPath = path.join(failLogDir, failFilename)
+  fileSys.saveJSONFile(failLogPath, failLog)
 }
 
 async function main() {
   try {
-    injectWorkLogJson()
-    await checkIfFail()
-
-    browser = await puppeteer.launch(userConfig.puppeteerConfig)
-    page = await browser.newPage()
-    await page.setDefaultNavigationTimeout(0)
-    await page.setViewport({ width: 1920, height: 1080 })
-    await intervalTask()
-
-    await browser.close()
-
-    if (fs.existsSync(failLogPath)) fs.unlinkSync(failLogPath)
+    await runScript()
   } catch (error) {
-    console.log('[main process error]')
-    console.error(error)
-
-    throw error
+    if (++retryCount >= limit) {
+      makeFailLog()
+      throw Error('Crawler failed due to reach limit')
+    } else {
+      console.log('[main process error] wait 60 sec')
+      await helper.wait(60)
+      main()
+    }
   }
 }
 
-main()
-
-process.on('exit', (code) => {
-  console.log(`exit code: ${code}, targetUrl: ${targetUrl}`)
-  if (code === 0 || !targetUrl) return
-
-  const photoData = Object.fromEntries(photos.entries())
-  const data = { currentUrl: targetUrl, photoData }
-
-  fileSys.saveJSONFile(failLogPath, data)
+process.on('SIGINT', () => {
+  makeFailLog()
+  process.exit(1)
 })
+
+process.on('uncaughtException', (error) => {
+  console.log('[index uncaughtException]')
+  console.error(error)
+})
+
+process.on('unhandledRejection', (error) => {
+  console.log('[index unhandledRejection]')
+  console.error(error)
+})
+
+checkFailInjection().then(main)

@@ -1,6 +1,7 @@
 node_modules
 package-lock.json
-cookie
 data
+fail
+cookie
 src/config.json
 fail.json

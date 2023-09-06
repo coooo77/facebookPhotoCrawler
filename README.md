@@ -1,3 +1,11 @@
+## login
+
+login to save cookie
+
+```
+npm run login
+```
+
 ### step 1 - fetch to local
 
 follow steps in your terminal

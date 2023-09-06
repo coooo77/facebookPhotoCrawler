@@ -1,6 +1,7 @@
 'use strict'
 import dns from 'dns'
 import readline from 'readline'
+import { setTimeout as wait } from 'node:timers/promises'
 
 export default {
   customPrompt(msg: string) {
@@ -19,7 +20,7 @@ export default {
       })
   },
 
-  wait: (seconds: number) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
+  wait: (seconds: number) => wait(seconds * 1000),
 
   checkInternetConnection(): Promise<boolean> {
     return new Promise((res) => {

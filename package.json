@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "npx ts-node src/index"
+    "start": "npx ts-node src/index",
+    "login": "npx ts-node src/login"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +17,7 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
+    "@clack/prompts": "^0.7.0",
     "image-downloader": "^4.3.0",
     "puppeteer": "^21.1.1",
     "puppeteer-extra": "^3.3.6",

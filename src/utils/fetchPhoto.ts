@@ -13,38 +13,36 @@ import type { PhotoInfo } from '../types/photo'
 interface Params {
   page: Page
   targetUrl: string
-  dataFolder: string
-  photos: Map<string, PhotoInfo>
+  photoData: Map<string, PhotoInfo>
 }
 
 export default class FetchPhoto {
   page: Page
   targetUrl: string
-  currentUrl = ''
-  dataFolder: string
   isFetchNextImg = false
-  photos: Map<string, PhotoInfo>
+  photoData: Map<string, PhotoInfo>
+  dataDirPath = fileSys.getOrCreateDirPath('data')
 
   selectors = {
-    nextImgButton: '[aria-label="Next photo"]',
-    preImgButton: '[aria-label="Previous photo"]',
+    nextImgButton: '[data-name="media-viewer-nav-container"] > div:nth-child(3) [aria-label]',
+    preImgButton: '[data-name="media-viewer-nav-container"] > div:nth-child(2) [aria-label]',
     readMore: '[role="complementary"] span [role="button"]',
     photoImg: 'img[data-visualcompletion="media-vc-image"]',
     complementary: '[role="complementary"] div.xyinxu5.x4uap5.x1g2khh7.xkhd6sd > span',
   }
 
-  constructor({ page, dataFolder, photos, targetUrl }: Params) {
+  constructor({ page, photoData, targetUrl }: Params) {
     this.page = page
-    this.photos = photos
+    this.photoData = photoData
     this.targetUrl = targetUrl
-    this.dataFolder = dataFolder
   }
 
   async process() {
     await this.navigateToPage()
 
-    const isContinueWork = this.photos.size !== 0
-    if (isContinueWork) await this.clickNextPage(this.getFbid())
+    const currentFbid = this.getFbid()
+    const isContinueWork = Boolean(currentFbid && this.photoData.get(currentFbid))
+    if (isContinueWork) await this.clickNextPage(currentFbid)
 
     do {
       await this.clickReadMore()
@@ -57,13 +55,13 @@ export default class FetchPhoto {
   }
 
   exportHandleLog() {
-    const data = Object.fromEntries(this.photos.entries())
-    const filePath = path.join(this.dataFolder, `${new Date().getTime()}.json`)
+    const data = Object.fromEntries(this.photoData.entries())
+    const filePath = path.join(this.dataDirPath, `${new Date().getTime()}.json`)
     fileSys.saveJSONFile(filePath, data)
   }
 
   async downloadPhotos(fbid: string, imgUrl: string) {
-    const photoPath = path.join(this.dataFolder, `${fbid}.jpg`)
+    const photoPath = path.join(this.dataDirPath, `${fbid}.jpg`)
     if (fs.existsSync(photoPath)) return
 
     await download.image({
@@ -78,10 +76,8 @@ export default class FetchPhoto {
     let id
 
     do {
-      await this.page.evaluate((s) => {
-        const nextBtn = document.querySelector(s.nextImgButton) as HTMLElement
-        nextBtn?.click()
-      }, this.selectors)
+      const nextImgButton = await this.page.$(this.selectors.nextImgButton)
+      if (nextImgButton) await Promise.all([nextImgButton.click(), this.page.waitForNavigation()])
 
       id = this.getFbid()
 
@@ -109,15 +105,13 @@ export default class FetchPhoto {
       await this.navigateToPage(this.page.url())
     } while (!fetchData.imgUrl)
 
-    const isPhotoFetched = Boolean(fbid && this.photos.get(fbid))
+    const isPhotoFetched = Boolean(fbid && this.photoData.get(fbid))
     if (isPhotoFetched) return { fbid, isPhotoFetched }
 
     const exportPhotoName = fbid || `${new Date().getTime()}_unknown_fbid`
 
-    this.currentUrl = this.page.url()
-
     if (fbid) {
-      this.photos.set(fbid, {
+      this.photoData.set(fbid, {
         imgUrl: fetchData.imgUrl,
         complementary: fetchData.complementary,
         url: this.page.url(),
@@ -127,7 +121,7 @@ export default class FetchPhoto {
     }
 
     if (userConfig.screenshotWeb) {
-      const screenshotPath = path.join(this.dataFolder, `${exportPhotoName}_screenshot.jpg`)
+      const screenshotPath = path.join(this.dataDirPath, `${exportPhotoName}_screenshot.jpg`)
       const isScreenshotExist = fs.existsSync(screenshotPath)
       if (!isScreenshotExist) await this.page.screenshot({ path: screenshotPath })
     }
@@ -161,15 +155,10 @@ export default class FetchPhoto {
   }
 
   async clickReadMore() {
-    const haveReadMore = await this.page.evaluate((s) => {
+    await this.page.evaluate((s) => {
       const readMoreBtn = document.querySelector(s.readMore) as HTMLElement
-      if (readMoreBtn && !readMoreBtn.innerHTML.includes('img')) {
-        readMoreBtn.click()
-      }
-
-      return Boolean(readMoreBtn)
+      const isReadMoreBtn = readMoreBtn && !readMoreBtn.innerHTML.includes('img')
+      if (isReadMoreBtn) readMoreBtn.click()
     }, this.selectors)
-
-    if (haveReadMore) await helper.wait(0.5)
   }
 }
