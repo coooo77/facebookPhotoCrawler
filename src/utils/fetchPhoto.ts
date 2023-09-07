@@ -38,6 +38,8 @@ export default class FetchPhoto {
   }
 
   async process() {
+    console.log('[fetchPhoto] process')
+
     await this.navigateToPage()
 
     const currentFbid = this.getFbid()
@@ -55,12 +57,16 @@ export default class FetchPhoto {
   }
 
   exportHandleLog() {
+    console.log('[fetchPhoto] exportHandleLog')
+
     const data = Object.fromEntries(this.photoData.entries())
     const filePath = path.join(this.dataDirPath, `${new Date().getTime()}.json`)
     fileSys.saveJSONFile(filePath, data)
   }
 
   async downloadPhotos(fbid: string, imgUrl: string) {
+    console.log('[fetchPhoto] downloadPhotos')
+
     const photoPath = path.join(this.dataDirPath, `${fbid}.jpg`)
     if (fs.existsSync(photoPath)) return
 
@@ -73,6 +79,8 @@ export default class FetchPhoto {
   }
 
   async clickNextPage(preFbid: string | null) {
+    console.log('[fetchPhoto] clickNextPage')
+
     let id
 
     do {
@@ -90,6 +98,7 @@ export default class FetchPhoto {
   }
 
   async processPhoto() {
+    console.log('[fetchPhoto] processPhoto')
     const fbid = this.getFbid()
 
     let failCount = 0
@@ -132,10 +141,12 @@ export default class FetchPhoto {
   }
 
   getFbid() {
+    console.log('[fetchPhoto] getFbid')
     return new URL(this.page.url()).searchParams.get('fbid')
   }
 
   async fetchPhotoInfo() {
+    console.log('[fetchPhoto] fetchPhotoInfo')
     const { imgUrl, complementary } = await this.page.evaluate((s) => {
       const img = document.querySelector(s.photoImg) as HTMLImageElement
       const complementary = document.querySelector(s.complementary) as HTMLElement
@@ -153,10 +164,12 @@ export default class FetchPhoto {
   }
 
   async navigateToPage(url = this.targetUrl) {
+    console.log('[fetchPhoto] navigateToPage')
     await Promise.all([this.page.goto(url), this.page.waitForNavigation({ waitUntil: 'networkidle0' })])
   }
 
   async clickReadMore() {
+    console.log('[fetchPhoto] clickReadMore')
     await this.page.evaluate((s) => {
       const readMoreBtn = document.querySelector(s.readMore) as HTMLElement
       const isReadMoreBtn = readMoreBtn && !readMoreBtn.innerHTML.includes('img')
