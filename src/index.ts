@@ -14,8 +14,8 @@ import type { FailLog, UserConfig } from './types/config'
 const userConfig = config as UserConfig
 
 const maxRetry = 120
-const retryLimit = Number(userConfig.retryLimit)
-const limit = retryLimit <= maxRetry ? retryLimit : maxRetry
+const retryLimit = Number(userConfig.mainRetryLimit)
+const limit = 0 < retryLimit && retryLimit <= maxRetry ? retryLimit : maxRetry
 const mainRetryWaitSec = Number(userConfig.mainRetryWaitSec)
 const retryWaitSec = mainRetryWaitSec <= 0 ? 60 : mainRetryWaitSec
 

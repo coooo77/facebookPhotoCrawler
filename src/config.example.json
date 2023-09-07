@@ -6,7 +6,8 @@
   "destination": "https://www.facebook.com/photo.php?fbid=XXX&set=XXX",
   "screenshotWeb": false,
   "fullLoad": false,
-  "retryLimit": 30,
-  "mainRetryWaitSec": 30,
-  "taskRetryWaitSec": 2
+  "mainRetryLimit": 10,
+  "mainRetryWaitSec": 5,
+  "taskRetryLimit": 10,
+  "taskRetryWaitSec": 5
 }

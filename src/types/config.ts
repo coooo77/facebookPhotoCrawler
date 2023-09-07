@@ -11,10 +11,11 @@ export interface UserConfig {
   puppeteerConfig: PuppeteerConfig
   destination: string
   screenshotWeb: boolean
-  retryLimit?: number
   fullLoad?: boolean
   workLogPath?: string
+  mainRetryLimit?: number
   mainRetryWaitSec?: number
+  taskRetryLimit?: number
   taskRetryWaitSec?: number
 }
 

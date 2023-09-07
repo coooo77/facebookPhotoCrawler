@@ -15,8 +15,11 @@ import type { ParentPhotoData, PhotoInfo } from '../types/photo'
 
 puppeteer.use(StealthPlugin())
 
-const retryLimit = 10
 const userConfig = config as UserConfig
+
+const maxRetry = 10
+const retryLimit = Number(userConfig.taskRetryLimit)
+const limit = 0 < retryLimit && retryLimit <= maxRetry ? retryLimit : maxRetry
 const taskRetryWaitSec = Number(userConfig.taskRetryWaitSec)
 const retryWaitSec = taskRetryWaitSec <= 0 ? 5 : taskRetryWaitSec
 
@@ -56,9 +59,9 @@ async function intervalTask() {
 
     fetchPhotoInstance = null
 
-    const shouldRetry = ++retryCount <= retryLimit
+    const shouldRetry = ++retryCount <= limit
     if (shouldRetry) {
-      console.log(`[intervalTask error] wait for ${retryWaitSec} sec, retry count: ${retryCount} / ${retryLimit}`)
+      console.log(`[intervalTask error] wait for ${retryWaitSec} sec, retry count: ${retryCount} / ${limit}`)
       await helper.wait(retryWaitSec)
 
       await intervalTask()
