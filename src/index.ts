@@ -16,6 +16,8 @@ const userConfig = config as UserConfig
 const maxRetry = 120
 const retryLimit = Number(userConfig.retryLimit)
 const limit = retryLimit <= maxRetry ? retryLimit : maxRetry
+const mainRetryWaitSec = Number(userConfig.mainRetryWaitSec)
+const retryWaitSec = mainRetryWaitSec <= 0 ? 60 : mainRetryWaitSec
 
 let retryCount = 0
 let currentUrl = userConfig.destination
@@ -94,8 +96,8 @@ async function main() {
       fileSys.saveFailLog(currentUrl, photoData)
       throw Error('Crawler failed due to reach limit')
     } else {
-      console.log(`[main process error] wait 60 sec, retry count: ${retryCount} / ${limit}`)
-      await helper.wait(60)
+      console.log(`[main process error] wait ${retryWaitSec} sec, retry count: ${retryCount} / ${limit}`)
+      await helper.wait(retryWaitSec)
       main()
     }
   }

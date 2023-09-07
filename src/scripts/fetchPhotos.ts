@@ -17,6 +17,8 @@ puppeteer.use(StealthPlugin())
 
 const retryLimit = 10
 const userConfig = config as UserConfig
+const taskRetryWaitSec = Number(userConfig.taskRetryWaitSec)
+const retryWaitSec = taskRetryWaitSec <= 0 ? 5 : taskRetryWaitSec
 
 let page: Page
 let browser: Browser
@@ -56,8 +58,8 @@ async function intervalTask() {
 
     const shouldRetry = ++retryCount <= retryLimit
     if (shouldRetry) {
-      console.log(`[intervalTask error] wait for 10 sec, retry count: ${retryCount} / ${retryLimit}`)
-      await helper.wait(10)
+      console.log(`[intervalTask error] wait for ${retryWaitSec} sec, retry count: ${retryCount} / ${retryLimit}`)
+      await helper.wait(retryWaitSec)
 
       await intervalTask()
     } else {

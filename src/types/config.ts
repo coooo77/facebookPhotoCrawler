@@ -14,6 +14,8 @@ export interface UserConfig {
   retryLimit?: number
   fullLoad?: boolean
   workLogPath?: string
+  mainRetryWaitSec?: number
+  taskRetryWaitSec?: number
 }
 
 export interface FailLog {
