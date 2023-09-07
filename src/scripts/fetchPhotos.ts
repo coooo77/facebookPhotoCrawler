@@ -15,7 +15,7 @@ import type { ParentPhotoData, PhotoInfo } from '../types/photo'
 
 puppeteer.use(StealthPlugin())
 
-const retryLimit = 3
+const retryLimit = 10
 const userConfig = config as UserConfig
 
 let page: Page
@@ -50,13 +50,13 @@ async function intervalTask() {
     console.error(error)
 
     const photoFetched = Array.from(photoData).at(-1)
-    if (photoFetched?.[1]?.imgUrl) currentUrl = photoFetched?.[1].imgUrl
+    if (photoFetched?.[1]?.imgUrl) currentUrl = photoFetched?.[1].url
 
     fetchPhotoInstance = null
 
     const shouldRetry = ++retryCount <= retryLimit
     if (shouldRetry) {
-      console.log('[intervalTask error] wait for 10 sec')
+      console.log(`[intervalTask error] wait for 10 sec, retry count: ${retryCount} / ${retryLimit}`)
       await helper.wait(10)
 
       await intervalTask()
@@ -79,6 +79,11 @@ async function checkCookieInjection(currentPage: Page) {
   }
 }
 
+function sendFailLog(from: string) {
+  process.send?.({ currentUrl, photoData: Object.fromEntries(photoData.entries()) })
+  console.log('send failLog from', from)
+}
+
 async function fetchPhotoMain() {
   try {
     initParentData()
@@ -96,6 +101,7 @@ async function fetchPhotoMain() {
   } catch (error) {
     console.log('[fetchPhotoMain error]')
     console.error(error)
+    sendFailLog('fetchPhotoMain')
 
     throw error
   }
@@ -107,15 +113,23 @@ process.on('exit', (code) => {
   console.log(`exit code: ${code}, targetUrl: ${currentUrl}`)
 
   if (code === 0 || !currentUrl) return
-  process.send?.({ currentUrl, photoData: Object.fromEntries(photoData.entries()) })
+
+  sendFailLog('exit')
+})
+
+process.on('SIGINT', () => {
+  fileSys.saveFailLog(currentUrl, photoData)
+  process.exit(1)
 })
 
 process.on('uncaughtException', (error) => {
   console.log('[script uncaughtException]')
   console.error(error)
+  throw error
 })
 
 process.on('unhandledRejection', (error) => {
   console.log('[script unhandledRejection]')
   console.error(error)
+  throw error
 })

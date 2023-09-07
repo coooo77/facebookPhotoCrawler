@@ -12,14 +12,17 @@ import type { PhotoInfo } from './types/photo'
 import type { FailLog, UserConfig } from './types/config'
 
 const userConfig = config as UserConfig
+
+const maxRetry = 120
 const retryLimit = Number(userConfig.retryLimit)
-const limit = retryLimit <= 120 ? retryLimit : 120
+const limit = retryLimit <= maxRetry ? retryLimit : maxRetry
 
 let retryCount = 0
 let currentUrl = userConfig.destination
 let photoData: Map<string, PhotoInfo> = new Map()
 
 function updateFetchInfo(failLog: FailLog) {
+  console.log('[updateFetchInfo]')
   currentUrl = failLog.currentUrl
   photoData = new Map(Object.entries(failLog.photoData))
 }
@@ -83,46 +86,31 @@ function runScript(): Promise<void> {
   })
 }
 
-function makeFailLog() {
-  const failLog: FailLog = {
-    currentUrl,
-    photoData: Object.fromEntries(photoData.entries()),
-  }
-
-  const failLogDir = fileSys.getOrCreateDirPath('fail')
-  const failFilename = `${new Date().getTime()}-fail.json`
-  const failLogPath = path.join(failLogDir, failFilename)
-  fileSys.saveJSONFile(failLogPath, failLog)
-}
-
 async function main() {
   try {
     await runScript()
   } catch (error) {
     if (++retryCount >= limit) {
-      makeFailLog()
+      fileSys.saveFailLog(currentUrl, photoData)
       throw Error('Crawler failed due to reach limit')
     } else {
-      console.log('[main process error] wait 60 sec')
+      console.log(`[main process error] wait 60 sec, retry count: ${retryCount} / ${limit}`)
       await helper.wait(60)
       main()
     }
   }
 }
 
-process.on('SIGINT', () => {
-  makeFailLog()
-  process.exit(1)
-})
-
 process.on('uncaughtException', (error) => {
   console.log('[index uncaughtException]')
   console.error(error)
+  throw error
 })
 
 process.on('unhandledRejection', (error) => {
   console.log('[index unhandledRejection]')
   console.error(error)
+  throw error
 })
 
 checkFailInjection().then(main)
