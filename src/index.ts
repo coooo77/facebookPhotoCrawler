@@ -92,6 +92,9 @@ async function main() {
   try {
     await runScript()
   } catch (error) {
+    console.log('[main process error]')
+    console.error(error)
+
     if (++retryCount >= limit) {
       fileSys.saveFailLog(currentUrl, photoData)
       throw Error('Crawler failed due to reach limit')

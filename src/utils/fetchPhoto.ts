@@ -56,7 +56,7 @@ export default class FetchPhoto {
 
   exportHandleLog() {
     const data = Object.fromEntries(this.photoData.entries())
-    const filePath = path.join(this.dataDirPath, `${new Date().getTime()}.json`)
+    const filePath = path.join(this.dataDirPath, `${helper.getTimeString()}_work_log.json`)
     fileSys.saveJSONFile(filePath, data)
   }
 
@@ -104,7 +104,7 @@ export default class FetchPhoto {
 
       if (++failCount <= 10) continue
       failCount = 0
-      await this.navigateToPage(this.page.url())
+      await this.page.reload({ waitUntil: 'networkidle0' })
     } while (!fetchData.imgUrl)
 
     const isPhotoFetched = Boolean(fbid && this.photoData.get(fbid))
