@@ -136,15 +136,17 @@ export default class FetchPhoto {
   }
 
   async fetchPhotoInfo() {
-    const { imgUrl, complementary } = await this.page.evaluate((s) => {
+    const { src, complementary } = await this.page.evaluate((s) => {
       const img = document.querySelector(s.photoImg) as HTMLImageElement
       const complementary = document.querySelector(s.complementary) as HTMLElement
 
       return {
-        imgUrl: img?.src,
+        src: img?.src,
         complementary: complementary?.innerText,
       }
     }, this.selectors)
+
+    const imgUrl = src && src.includes('?') ? src.split('?')[0] : ''
 
     return {
       imgUrl,
