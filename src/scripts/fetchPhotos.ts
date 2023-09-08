@@ -30,15 +30,6 @@ let currentUrl = ''
 let fetchPhotoInstance: FetchPhoto | null = null
 let photoData: Map<string, PhotoInfo> = new Map()
 
-function initParentData() {
-  const [stringData] = process.argv.splice(2)
-  if (!stringData) throw new Error('fail to parse data from parent process')
-
-  const dataParsed = JSON.parse(stringData) as ParentPhotoData
-  currentUrl = dataParsed.currentUrl
-  photoData = new Map(Object.entries(dataParsed.photoData))
-}
-
 async function intervalTask() {
   if (!currentUrl) throw new Error('no current url provided')
 
@@ -52,7 +43,7 @@ async function intervalTask() {
     await fetchPhotoInstance.process()
   } catch (error) {
     console.log('[intervalTask error]')
-    console.error(error)
+    if (error) console.error(error)
 
     const photoFetched = Array.from(photoData).at(-1)
     if (photoFetched?.[1]?.imgUrl) currentUrl = photoFetched?.[1].url
@@ -91,8 +82,6 @@ function sendFailLog(from: string) {
 
 async function fetchPhotoMain() {
   try {
-    initParentData()
-
     browser = await puppeteer.launch(userConfig.puppeteerConfig)
 
     page = await browser.newPage()
@@ -112,7 +101,12 @@ async function fetchPhotoMain() {
   }
 }
 
-fetchPhotoMain()
+process.once('message', (message: ParentPhotoData) => {
+  currentUrl = message.currentUrl
+  photoData = new Map(Object.entries(message.photoData))
+
+  fetchPhotoMain()
+})
 
 process.on('exit', (code) => {
   console.log(`exit code: ${code}, targetUrl: ${currentUrl}`)

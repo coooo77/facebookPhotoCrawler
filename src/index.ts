@@ -72,9 +72,7 @@ async function checkFailInjection() {
 
 function runScript(): Promise<void> {
   return new Promise((res, rej) => {
-    const payload = JSON.stringify({ currentUrl, photoData: Object.fromEntries(photoData.entries()) })
-
-    const child_process = cp.fork(path.join(__dirname, 'scripts', 'fetchPhotos.ts'), [payload])
+    const child_process = cp.fork(path.join(__dirname, 'scripts', 'fetchPhotos.ts'))
 
     child_process.on('message', updateFetchInfo)
 
@@ -85,6 +83,8 @@ function runScript(): Promise<void> {
       const closeFn = code === 0 ? res : rej
       closeFn()
     })
+
+    child_process.send({ currentUrl, photoData: Object.fromEntries(photoData.entries()) })
   })
 }
 
