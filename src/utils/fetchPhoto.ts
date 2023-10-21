@@ -146,10 +146,10 @@ export default class FetchPhoto {
       }
     }, this.selectors)
 
-    const imgUrl = src && src.includes('?') ? src.split('?')[0] : ''
+    // const imgUrl = src && src.includes('?') ? src.split('?')[0] : ''
 
     return {
-      imgUrl,
+      imgUrl: src,
       complementary,
     }
   }
